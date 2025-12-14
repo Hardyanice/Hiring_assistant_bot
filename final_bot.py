@@ -77,71 +77,72 @@ Keep responses short, clear, and professional.
 # ----------------------------
 def cosine_similarity(v1, v2):
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+    
+# ----------------------------
+# Cached static embeddings
+# ----------------------------
+@st.cache_resource
+def get_hiring_vector():
+    HIRING_CONTEXT = [
+        "job application",
+        "candidate information",
+        "experience years",
+        "interview process",
+        "tech stack declaration",
+        "hiring assistant"
+    ]
+    hiring_embed = co.embed(texts=HIRING_CONTEXT, model="embed-english-v2.0").embeddings
+    return np.mean(hiring_embed, axis=0)
 
 
-# Pre-compute embedding for hiring domain (unchanged as requested)
-HIRING_CONTEXT = [
-    "job application",
-    "candidate information",
-    "experience years",
-    "interview process",
-    "tech stack declaration",
-    "hiring assistant"
-]
-
-hiring_embed = co.embed(
-    texts=HIRING_CONTEXT, 
-    model="embed-english-v2.0"
-).embeddings
-
-hiring_avg_vector = np.mean(hiring_embed, axis=0)
-
-# Sentiment embeddings for reqriting questions
-REWRITE_INTENT_EXAMPLES = [
-    "rewrite the questions",
-    "regenerate new questions",
-    "give different questions",
-    "change the questions",
-    "i want easier questions",
-    "give me harder questions",
-    "modify the question difficulty",
-    "show me a new question set",
-    "can you adjust the questions"
-]
-
-rewrite_intent_vectors = co.embed(
-    texts=REWRITE_INTENT_EXAMPLES,
-    model="embed-english-v2.0"
-).embeddings
-
-rewrite_intent_vector = np.mean(rewrite_intent_vectors, axis=0)
+@st.cache_resource
+def get_rewrite_intent_vector():
+    REWRITE_INTENT_EXAMPLES = [
+        "rewrite the questions",
+        "regenerate new questions",
+        "give different questions",
+        "change the questions",
+        "new questions please",
+        "i want easier questions",
+        "give me harder questions",
+        "modify the questions",
+        "can you adjust the difficulty",
+    ]
+    rewrite_vecs = co.embed(texts=REWRITE_INTENT_EXAMPLES, model="embed-english-v2.0").embeddings
+    return np.mean(rewrite_vecs, axis=0)
 
 
+@st.cache_resource
+def get_sentiment_reference_vectors():
+    positive_refs = ["great", "happy", "confident", "excited", "good", "interested"]
+    negative_refs = ["confused", "sad", "angry", "upset", "frustrated", "bad"]
+
+    pos_vecs = co.embed(texts=positive_refs, model="embed-english-v2.0").embeddings
+    neg_vecs = co.embed(texts=negative_refs, model="embed-english-v2.0").embeddings
+
+    return pos_vecs, neg_vecs
+
+
+hiring_avg_vector = get_hiring_vector()
+rewrite_intent_vector = get_rewrite_intent_vector()
+positive_vecs, negative_vecs = get_sentiment_reference_vectors()
 
 
 # ----------------------------
 # Sentiment Analysis
 # ----------------------------
 def get_sentiment(text):
-
-    positive_refs = ["great", "happy", "confident", "excited", "good", "interested"]
-    negative_refs = ["confused", "sad", "angry", "upset", "frustrated", "bad"]
-    
     try:
-        # Embed user input
+        # Embed user text ONCE
         text_vec = co.embed(texts=[text], model="embed-english-v2.0").embeddings[0]
 
-        # Reference embeddings
-        pos_vecs = co.embed(texts=positive_refs, model="embed-english-v2.0").embeddings
-        neg_vecs = co.embed(texts=negative_refs, model="embed-english-v2.0").embeddings
+        # Compare to cached reference vectors
+        pos_sim = max(cosine_similarity(text_vec, p) for p in positive_vecs)
+        neg_sim = max(cosine_similarity(text_vec, n) for n in negative_vecs)
 
-        # Compute similarities
-        pos_sim = max(cosine_similarity(text_vec, p) for p in pos_vecs)
-        neg_sim = max(cosine_similarity(text_vec, n) for n in neg_vecs)
-
-        if pos_sim > neg_sim:
+        if pos_sim > neg_sim and pos_sim > 0.35:
             sentiment = "positive"
-        elif neg_sim > pos_sim:
+        elif neg_sim > pos_sim and neg_sim > 0.35:
             sentiment = "negative"
         else:
             sentiment = "neutral"
@@ -149,14 +150,13 @@ def get_sentiment(text):
     except:
         sentiment = "neutral"
 
-    # ALWAYS LOG
+    # ALWAYS LOG SENTIMENT
     st.session_state.sentiment_log.append({
         "text": text,
         "sentiment": sentiment
     })
 
     return sentiment
-
 
 
 # ----------------------------
@@ -443,4 +443,5 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
