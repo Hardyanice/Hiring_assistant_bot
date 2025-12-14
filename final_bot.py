@@ -98,83 +98,90 @@ def cosine_similarity(v1, v2):
 # Cached static embeddings
 # ----------------------------
 @st.cache_resource
-def get_hiring_vector():
-    HIRING_CONTEXT = [
-        "job application",
-        "candidate information",
-        "experience years",
-        "interview process",
-        "tech stack declaration",
-        "hiring assistant"
-    ]
-    hiring_embed = co.embed(texts=HIRING_CONTEXT, model="embed-english-v2.0").embeddings
-    return np.mean(hiring_embed, axis=0)
+def get_all_reference_vectors():
+    reference_texts = {
+        "hiring": [
+            "job application",
+            "candidate information",
+            "experience years",
+            "interview process",
+            "tech stack declaration",
+            "hiring assistant",
+        ],
+        "rewrite": [
+            "rewrite the questions",
+            "regenerate new questions",
+            "give different questions",
+            "change the questions",
+            "new questions please",
+            "i want easier questions",
+            "give me harder questions",
+            "modify the questions",
+            "can you adjust the difficulty",
+        ],
+        "clarify": [
+            "what is required of me",
+            "what do you mean",
+            "explain the question",
+            "clarify the question",
+            "what should i write",
+            "can you explain question 1",
+            "what is expected in this question",
+            "how should I answer this",
+            "what does this question mean",
+        ],
+        "answer": [
+            "the answer is",
+            "you can do this by",
+            "this can be solved using",
+            "we handle this by",
+            "one approach is",
+            "in python you can",
+            "you should use",
+            "the solution involves",
+            "a method to do this is",
+        ],
+        "positive": [
+            "great", "happy", "confident", "excited", "good", "interested"
+        ],
+        "negative": [
+            "confused", "sad", "angry", "upset", "frustrated", "bad"
+        ],
+    }
 
+    # Flatten to one list for batching
+    all_texts = []
+    index_map = {}
+    idx = 0
 
-@st.cache_resource
-def get_rewrite_intent_vector():
-    REWRITE_INTENT_EXAMPLES = [
-        "rewrite the questions",
-        "regenerate new questions",
-        "give different questions",
-        "change the questions",
-        "new questions please",
-        "i want easier questions",
-        "give me harder questions",
-        "modify the questions",
-        "can you adjust the difficulty",
-    ]
-    rewrite_vecs = co.embed(texts=REWRITE_INTENT_EXAMPLES, model="embed-english-v2.0").embeddings
-    return np.mean(rewrite_vecs, axis=0)
+    for category, texts in reference_texts.items():
+        index_map[category] = (idx, idx + len(texts))
+        all_texts.extend(texts)
+        idx += len(texts)
 
+    # ONE embedding call instead of 45 calls
+    vectors = co.embed(texts=all_texts, model="embed-english-v2.0").embeddings
 
-@st.cache_resource
-def get_sentiment_reference_vectors():
-    positive_refs = ["great", "happy", "confident", "excited", "good", "interested"]
-    negative_refs = ["confused", "sad", "angry", "upset", "frustrated", "bad"]
+    # Return resolved category vectors
+    return {
+        "hiring": np.mean(vectors[index_map["hiring"][0]:index_map["hiring"][1]], axis=0),
+        "rewrite": np.mean(vectors[index_map["rewrite"][0]:index_map["rewrite"][1]], axis=0),
+        "clarify": np.mean(vectors[index_map["clarify"][0]:index_map["clarify"][1]], axis=0),
+        "answer": np.mean(vectors[index_map["answer"][0]:index_map["answer"][1]], axis=0),
+        "positive": vectors[index_map["positive"][0]:index_map["positive"][1]],
+        "negative": vectors[index_map["negative"][0]:index_map["negative"][1]],
+    }
 
-    pos_vecs = co.embed(texts=positive_refs, model="embed-english-v2.0").embeddings
-    neg_vecs = co.embed(texts=negative_refs, model="embed-english-v2.0").embeddings
+vectors = get_all_reference_vectors()
 
-    return pos_vecs, neg_vecs
+hiring_avg_vector = vectors["hiring"]
+rewrite_intent_vector = vectors["rewrite"]
+clarification_intent_vector = vectors["clarify"]
+answer_intent_vector = vectors["answer"]
 
-@st.cache_resource
-def get_clarification_intent_vector():
-    CLARIFICATION_EXAMPLES = [
-        "what is required of me",
-        "what do you mean",
-        "explain the question",
-        "clarify the question",
-        "what should i write",
-        "can you explain question 1",
-        "what is expected in this question",
-        "how should I answer this",
-        "what does this question mean"
-    ]
-    vecs = co.embed(texts=CLARIFICATION_EXAMPLES, model="embed-english-v2.0").embeddings
-    return np.mean(vecs, axis=0)
+positive_vecs = vectors["positive"]
+negative_vecs = vectors["negative"]
 
-@st.cache_resource
-def get_answer_intent_vector():
-    ANSWER_EXAMPLES = [
-        "the answer is",
-        "you can do this by",
-        "this can be solved using",
-        "we handle this by",
-        "one approach is",
-        "in python you can",
-        "you should use",
-        "the solution involves",
-        "a method to do this is"
-    ]
-    vecs = co.embed(texts=ANSWER_EXAMPLES, model="embed-english-v2.0").embeddings
-    return np.mean(vecs, axis=0)
-
-hiring_avg_vector = get_hiring_vector()
-rewrite_intent_vector = get_rewrite_intent_vector()
-positive_vecs, negative_vecs = get_sentiment_reference_vectors()
-clarification_intent_vector = get_clarification_intent_vector()
-answer_intent_vector = get_answer_intent_vector()
 
 # ----------------------------
 # Sentiment Analysis
@@ -521,6 +528,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
