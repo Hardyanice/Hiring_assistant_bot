@@ -225,10 +225,14 @@ def bot_reply(user_message):
 
 
     # If still at the very beginning → give full intro
-    if step == "greet":
-        if is_greeting(user_message):
+    if is_greeting(user_message):
+    # First interaction → full intro
+        if step == "greet":
             st.session_state.step = "name"
             return "Hello! I'm TalentScout's Hiring Assistant.\n\nWhat is your full name?"
+    
+        # Mid-interview greeting → polite nudge
+        return "Hello again! Let's continue with your interview. Please go ahead."
 
     if step == "name":
         c["name"] = user_message
