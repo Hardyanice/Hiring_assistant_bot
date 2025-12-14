@@ -208,39 +208,39 @@ def bot_reply(user_message):
     # ----------------------
     def is_greeting(text):
         GREETING_WORDS = [
-    # English
-    "hi", "hello", "hey", "hey there", "hi there", "hello there",
-    "good morning", "good afternoon", "good evening",
-    "greetings", "howdy",
-
-    # Friendly/slang
-    "hiya", "yo", "sup", "what's up", "whats up", "wassup", "sup?",
-
-    # European
-    "hola",     # Spanish
-    "hallo",    # German
-    "bonjour",  # French
-    "ciao",     # Italian
-    "ola",      # Portuguese
-    "salut",    # French informal
-    "hej",      # Swedish/Danish
-    "hei",      # Norwegian/Finnish
-
-    # Asian
-    "namaste", "namaskar",      # Hindi/Indian
-    "vanakkam",                 # Tamil
-    "salaam", "assalamu alaikum",  # Arabic greetings
-    "konnichiwa",               # Japanese
-    "annyeong", "annyeonghaseyo",  # Korean
-    "ni hao",                   # Chinese
-    "sawasdee",                 # Thai
-
-    # Hawaiian / Pacific
-    "aloha",
-
-    # Very short but valid greetings
-    "hi!", "hello!", "hey!"
-]
+        # English
+        "hi", "hello", "hey", "hey there", "hi there", "hello there",
+        "good morning", "good afternoon", "good evening",
+        "greetings", "howdy",
+    
+        # Friendly/slang
+        "hiya", "yo", "sup", "what's up", "whats up", "wassup", "sup?",
+    
+        # European
+        "hola",     # Spanish
+        "hallo",    # German
+        "bonjour",  # French
+        "ciao",     # Italian
+        "ola",      # Portuguese
+        "salut",    # French informal
+        "hej",      # Swedish/Danish
+        "hei",      # Norwegian/Finnish
+    
+        # Asian
+        "namaste", "namaskar",      # Hindi/Indian
+        "vanakkam",                 # Tamil
+        "salaam", "assalamu alaikum",  # Arabic greetings
+        "konnichiwa",               # Japanese
+        "annyeong", "annyeonghaseyo",  # Korean
+        "ni hao",                   # Chinese
+        "sawasdee",                 # Thai
+    
+        # Hawaiian / Pacific
+        "aloha",
+    
+        # Very short but valid greetings
+        "hi!", "hello!", "hey!"
+    ]
 
 
         try:
@@ -252,7 +252,7 @@ def bot_reply(user_message):
 
             # Compute max similarity
             sims = [cosine_similarity(user_vec, g) for g in greet_vecs]
-            return max(sims) > 0.0
+            return max(sims) > 0.15
         except:
             return False
 
@@ -425,6 +425,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
