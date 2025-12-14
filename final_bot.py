@@ -323,9 +323,12 @@ def bot_reply(user_message):
             Tech stack: {c['tech_stack']}
             Position: {c['position']}
             Bullet points only.
+            Maintain context from previous user input.
     
         IF clarification:
-            Explain what the question expects, and offer to regenerate questions.
+            Explain what the question expects.
+            Explain the quetion in simpler terms.
+            Maintain context from previous user input.
     
         IF answer:
             Provide:
@@ -333,6 +336,7 @@ def bot_reply(user_message):
             - What needs improvement
             - 1–2 suggestions
             - A follow-up question
+            Maintain context from previous user input.
     
         IF nonsense:
             Say: "That doesn't look like a meaningful response. 
@@ -390,6 +394,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
