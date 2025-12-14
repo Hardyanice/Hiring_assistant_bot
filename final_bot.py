@@ -182,6 +182,37 @@ answer_intent_vector = vectors["answer"]
 positive_vecs = vectors["positive"]
 negative_vecs = vectors["negative"]
 
+#--------------------------
+# Intent classifier
+#--------------------------
+def classify_intent(text):
+    prompt = f"""
+    Classify the user's message into ONE of these categories:
+    - rewrite
+    - clarification
+    - answer
+    - nonsense
+
+    Message: "{text}"
+
+    Rules:
+    - "rewrite" = asking to regenerate or change questions
+    - "clarification" = asking what the question means or what is expected
+    - "answer" = attempting to answer a technical question
+    - "nonsense" = gibberish or unrelated to interview
+
+    Respond ONLY with one label.
+    """
+
+    result = co.chat(
+        model="command-r-plus-08-2024",
+        message=prompt,
+        max_tokens=5,
+        temperature=0
+    )
+
+    return result.text.strip().lower()
+
 
 # ----------------------------
 # Sentiment Analysis
@@ -409,88 +440,64 @@ def bot_reply(user_message):
     # ------------------------------
     if step == "generate_questions":
 
-        # ---- Embed user message ----
-        try:
-            user_vec = co.embed(texts=[user_message], model="embed-english-v2.0").embeddings[0]
-        except:
-            user_vec = None
+        intent = classify_intent(user_message)
     
-        # ---- Compute similarities ----
-        sim_hiring = cosine_similarity(user_vec, hiring_avg_vector) if user_vec is not None else 0
-        sim_rewrite = cosine_similarity(user_vec, rewrite_intent_vector) if user_vec is not None else 0
-        sim_clarify = cosine_similarity(user_vec, clarification_intent_vector) if user_vec is not None else 0
-        sim_answer = cosine_similarity(user_vec, answer_intent_vector) if user_vec is not None else 0
-    
-        # --- Rewrite intent (strongest priority) ---
-        if sim_rewrite > 0.55:
+        # --- Rewrite request ---
+        if intent == "rewrite":
             tech = c["tech_stack"]
             role = c["position"]
     
             rewrite_prompt = f"""
-            The candidate has requested a new or modified question set.
-    
-            Regenerate a fresh set of technical interview questions based on:
-            - Tech stack: {tech}
-            - Position level: {role}
-    
-            Output clean bullet points only.
+            Regenerate a fresh set of 3–5 interview questions per technology.
+            Tech stack: {tech}
+            Position level: {role}
+            Return bullet points only.
             """
-    
             new_q = call_llm(rewrite_prompt)
-            return f"Sure! Here is a new set of tailored questions:\n\n{new_q}"
+            return f"Sure! Here's a new set of questions:\n\n{new_q}"
     
-        # --- Nonsense detection (very low similarity to everything) ---
-        if sim_hiring < 0.03 and sim_clarify < 0.10 and sim_answer < 0.10:
+        # --- Nonsense ---
+        if intent == "nonsense":
             return (
-                "Hmm, that doesn't look like a meaningful response.\n"
+                "That doesn't look like a meaningful response.\n"
                 "Please answer one of the technical questions or type 'exit' to end."
             )
     
-        # --- Clarification questions ---
-        if sim_clarify > sim_answer and sim_clarify > 0.25:
+        # --- Clarification ---
+        if intent == "clarification":
             clarification_prompt = f"""
-            The candidate is asking a clarification:
+            The candidate asked for clarification:
     
             "{user_message}"
     
-            Provide a helpful explanation:
-            - Clarify what the question expects.
-            - Give gentle guidance.
-            - Offer to regenerate questions if needed.
+            Provide:
+            - A clear explanation of what the technical question expects
+            - Optional example
+            - Offer to regenerate the questions if needed
             """
-    
             return call_llm(clarification_prompt)
     
-        # --- Technical answer (dominant) ---
-        if sim_answer > sim_clarify and sim_answer > 0.20:
+        # --- Answer (evaluate) ---
+        if intent == "answer":
             evaluation_prompt = f"""
-            You are a senior technical interviewer.
-    
             Candidate's answer:
-            \"\"\"{user_message}\"\"\"\n
+            \"\"\"{user_message}\"\"\"
     
-            Provide natural, conversational feedback:
+            Provide:
             - What they got right
-            - What they misunderstood or missed
-            - 1–2 improvement suggestions
-            - A follow-up question
-            """
+            - What needs improvement
+            - 1–2 suggestions
+            - A relevant follow-up question
     
+            Tone: friendly, conversational, supportive.
+            """
             return call_llm(evaluation_prompt)
     
-        # --- Default fallback (treat as answer but gently) ---
-        fallback_prompt = f"""
-        The candidate said:
-        \"\"\"{user_message}\"\"\"
-    
-        It might be a partial answer or unclear attempt.
-        Provide:
-        - Acknowledgement
-        - Clarification on what the question expects
-        - Ask them to try again or elaborate
-        """
-    
-        return call_llm(fallback_prompt)
+        # --- Default fallback ---
+        return (
+            "I'm not sure I understood that. Try answering the question or ask for clarification."
+        )
+
 
 
 
@@ -528,6 +535,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
