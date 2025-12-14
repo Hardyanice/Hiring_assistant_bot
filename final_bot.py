@@ -87,7 +87,6 @@ Your ONLY tasks:
 Keep responses short, clear, and professional.
 """
 
-
 # ----------------------------
 # Cosine Similarity Helper
 # ----------------------------
@@ -95,114 +94,20 @@ def cosine_similarity(v1, v2):
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
     
 # ----------------------------
-# Cached static embeddings
-# ----------------------------
-@st.cache_resource
-def get_all_reference_vectors():
-    reference_texts = {
-        "hiring": [
-            "job application",
-            "candidate information",
-            "experience years",
-            "interview process",
-            "tech stack declaration",
-            "hiring assistant",
-        ],
-        "positive": [
-            "great", "happy", "confident", "excited", "good", "interested"
-        ],
-        "negative": [
-            "confused", "sad", "angry", "upset", "frustrated", "bad"
-        ],
-    }
-
-    # Flatten to one list for batching
-    all_texts = []
-    index_map = {}
-    idx = 0
-
-    for category, texts in reference_texts.items():
-        index_map[category] = (idx, idx + len(texts))
-        all_texts.extend(texts)
-        idx += len(texts)
-
-    # ONE embedding call instead of 45 calls
-    vectors = co.embed(texts=all_texts, model="embed-english-v2.0").embeddings
-
-    # Return resolved category vectors
-    return {
-        "hiring": np.mean(vectors[index_map["hiring"][0]:index_map["hiring"][1]], axis=0),
-        "positive": vectors[index_map["positive"][0]:index_map["positive"][1]],
-        "negative": vectors[index_map["negative"][0]:index_map["negative"][1]],
-    }
-
-vectors = get_all_reference_vectors()
-
-positive_vecs = vectors["positive"]
-negative_vecs = vectors["negative"]
-
-#--------------------------
-# Intent classifier
-#--------------------------
-def classify_intent(text):
-    prompt = f"""
-    Classify the user's message into ONE of these categories:
-    - rewrite
-    - clarification
-    - answer
-    - nonsense
-
-    Message: "{text}"
-
-    Rules:
-    - "rewrite" = asking to regenerate or change questions
-    - "clarification" = asking what the question means or what is expected
-    - "answer" = attempting to answer a technical question
-    - "nonsense" = gibberish or unrelated to interview
-
-    Respond ONLY with one label.
-    """
-
-    result = co.chat(
-        model="command-r-plus-08-2024",
-        message=prompt,
-        max_tokens=5,
-        temperature=0
-    )
-
-    return result.text.strip().lower()
-
-
-# ----------------------------
 # Sentiment Analysis
 # ----------------------------
 def get_sentiment(text):
     try:
-        # Embed user text ONCE
-        text_vec = co.embed(texts=[text], model="embed-english-v2.0").embeddings[0]
-
-        # Compare to cached reference vectors
-        pos_sim = max(cosine_similarity(text_vec, p) for p in positive_vecs)
-        neg_sim = max(cosine_similarity(text_vec, n) for n in negative_vecs)
-
-        if pos_sim > neg_sim and pos_sim > 0.35:
-            sentiment = "positive"
-        elif neg_sim > pos_sim and neg_sim > 0.35:
-            sentiment = "negative"
-        else:
-            sentiment = "neutral"
-
+        result = co.classify(
+            model="sentiment",
+            inputs=[text]
+        )
+        sentiment = result.classifications[0].prediction
     except:
         sentiment = "neutral"
 
-    # ALWAYS LOG SENTIMENT
-    st.session_state.sentiment_log.append({
-        "text": text,
-        "sentiment": sentiment
-    })
-
+    st.session_state.sentiment_log.append({"text": text, "sentiment": sentiment})
     return sentiment
-
 
 # ----------------------------
 # LLM CALL WRAPPER
@@ -398,64 +303,55 @@ def bot_reply(user_message):
     # ANSWER / CLARIFICATION / REWRITE / NONSENSE DETECTION
     # ------------------------------
     if step == "generate_questions":
-
-        intent = classify_intent(user_message)
     
-        # --- Rewrite request ---
-        if intent == "rewrite":
-            tech = c["tech_stack"]
-            role = c["position"]
+        intent_and_response_prompt = f"""
+        You are a hiring assistant evaluating candidate messages.
     
-            rewrite_prompt = f"""
-            Regenerate a fresh set of 3–5 interview questions per technology.
-            Tech stack: {tech}
-            Position level: {role}
-            Return bullet points only.
-            """
-            new_q = call_llm(rewrite_prompt)
-            return f"Sure! Here's a new set of questions:\n\n{new_q}"
+        Classify the message into one of the following:
+        - rewrite      (user wants new questions)
+        - clarification (user doesn’t understand a question)
+        - answer       (user is answering)
+        - nonsense     (gibberish or irrelevant)
     
-        # --- Nonsense ---
-        if intent == "nonsense":
-            return (
-                "That doesn't look like a meaningful response.\n"
-                "Please answer one of the technical questions or type 'exit' to end."
-            )
+        User message:
+        "{user_message}"
     
-        # --- Clarification ---
-        if intent == "clarification":
-            clarification_prompt = f"""
-            The candidate asked for clarification:
+        After classifying, produce the appropriate response:
     
-            "{user_message}"
+        IF rewrite:
+            Regenerate a new set of interview questions for:
+            Tech stack: {c['tech_stack']}
+            Position: {c['position']}
+            Bullet points only.
     
-            Provide:
-            - A clear explanation of what the technical question expects
-            - Optional example
-            - Offer to regenerate the questions if needed
-            """
-            return call_llm(clarification_prompt)
+        IF clarification:
+            Explain what the question expects, and offer to regenerate questions.
     
-        # --- Answer (evaluate) ---
-        if intent == "answer":
-            evaluation_prompt = f"""
-            Candidate's answer:
-            \"\"\"{user_message}\"\"\"
-    
+        IF answer:
             Provide:
             - What they got right
             - What needs improvement
             - 1–2 suggestions
-            - A relevant follow-up question
+            - A follow-up question
     
-            Tone: friendly, conversational, supportive.
-            """
-            return call_llm(evaluation_prompt)
+        IF nonsense:
+            Say: "That doesn't look like a meaningful response. 
+            Please answer a technical question or type 'exit'."
     
-        # --- Default fallback ---
-        return (
-            "I'm not sure I understood that. Try answering the question or ask for clarification."
-        )
+        Respond in this exact JSON format:
+        {{
+            "intent": "<intent>",
+            "response": "<assistant_response>"
+        }}
+        """
+    
+        raw = call_llm(intent_and_response_prompt)
+    
+        try:
+            data = json.loads(raw)
+            return data["response"]
+        except:
+            return raw
 
 
 
@@ -494,6 +390,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
