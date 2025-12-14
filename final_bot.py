@@ -370,71 +370,55 @@ def bot_reply(user_message):
     # ------------------------------
     if step == "generate_questions":
 
-        # Embed user message
+        # ---- Compute similarity safely ----
         try:
             user_vec = co.embed(texts=[user_message], model="embed-english-v2.0").embeddings[0]
+            sim_to_hiring = cosine_similarity(user_vec, hiring_avg_vector)
+            rewrite_sim = cosine_similarity(user_vec, rewrite_intent_vector)
         except:
-            user_vec = None
-
-        # Compute similarities (safe fallbacks)
-        sim_to_hiring = cosine_similarity(user_vec, hiring_avg_vector) if user_vec is not None else 0.0
-        rewrite_sim = cosine_similarity(user_vec, rewrite_intent_vector) if user_vec is not None else 0.0
-
-        # Semantic Rewrite Intent to regenerate questions
-        if rewrite_sim > 0.55:
-            tech = c["tech_stack"]
-            role = c["position"]
-
-            rewrite_prompt = f"""
-            The candidate has requested a modified or newly generated question set.
-
-            Task:
-            - Regenerate fresh interview questions.
-            - Base them on: {tech}
-            - Tailor difficulty to the applied position: {role}
-            - Keep the style professional and relevant.
-            - Provide clean bullet points only.
-
-            Return ONLY the new set of questions.
-            """
-            new_questions = call_llm(rewrite_prompt)
-            return f"Sure! Here's an updated set of tailored questions:\n\n{new_questions}\n\nYou may answer them whenever you're ready."
-
-        # Nonsense or irrelevant to direct but polite notice
-        if sim_to_hiring < 0.3:
+            sim_to_hiring = 0.0
+            rewrite_sim = 0.0
+        
+        # ---- 1. Rewrite request ----
+        if rewrite_sim > 0.50:
+            # (same rewrite block)
+            ...
+        
+        # ---- 2. TRUE NONSENSE (very low similarity) ----
+        # Only treat as nonsense if similarity is extremely low
+        if sim_to_hiring < 0.03:
             return (
                 "Hmm, that doesn't look like a meaningful response.\n"
-                "Please answer one of the technical questions or type *'exit'* to end."
+                "Please answer one of the technical questions or type 'exit' to end."
             )
-
-        # Clarification (general but job-related question)
-        if sim_to_hiring >= 0.3 and sim_to_hiring <= 0.50:
+        
+        # ---- 3. Clarification questions (moderate similarity) ----
+        if 0.03 <= sim_to_hiring <= 0.25:
             clarification_prompt = f"""
-            The candidate asked a clarification related to the interview context:
-
+            The candidate is asking for clarification:
+        
             "{user_message}"
-
-            Respond naturally and professionally:
-            - Explain how the questions were generated (tech stack + experience + position) only if candidate asks queries regarding tech stack or difficulty.
-            - Offer to regenerate questions if needed.
-            - Keep tone conversational.
+        
+            Respond naturally:
+            - Explain briefly what the question expects.
+            - Offer guidance.
+            - Keep it supportive and concise.
             """
             return call_llm(clarification_prompt)
-
-        # Valid technical answer then evaluate it
+        
+        # ---- 4. Technical answer (default handling) ----
         evaluation_prompt = f"""
-        You are a senior technical interviewer evaluating a candidate's answer.
-
-        Candidate's answer:
-        \"\"\"{user_message}\"\"\"\n
-
-        Provide feedback in a natural, conversational style:
-        - Start by acknowledging what they attempted or understood.
-        - Highlight any correct reasoning.
-        - Point out gaps gently, without harshness.
-        - Ask a relevant follow-up question that builds on their answer.
-
-        DO NOT be robotic or overly formal—make it sound like a real human interviewer.
+        You are a senior interviewer evaluating the candidate's answer:
+        
+        \"\"\"{user_message}\"\"\" 
+        
+        Provide:
+        - Acknowledgment of what they got right
+        - Missing parts
+        - 1–2 improvements
+        - A follow-up question
+        
+        Tone should be natural, human, and supportive.
         """
         return call_llm(evaluation_prompt)
 
@@ -474,6 +458,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
