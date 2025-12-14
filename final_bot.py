@@ -252,7 +252,7 @@ def bot_reply(user_message):
 
             # Compute max similarity
             sims = [cosine_similarity(user_vec, g) for g in greet_vecs]
-            return max(sims) < 0.1
+            return max(sims) > 0.0
         except:
             return False
 
@@ -425,6 +425,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
