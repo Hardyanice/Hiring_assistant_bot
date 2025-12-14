@@ -401,14 +401,14 @@ def bot_reply(user_message):
             return f"Sure! Here's an updated set of tailored questions:\n\n{new_questions}\n\nYou may answer them whenever you're ready."
 
         # Nonsense or irrelevant to direct but polite notice
-        if sim_to_hiring < 0.25:
+        if sim_to_hiring < 0.3:
             return (
                 "Hmm, that doesn't look like a meaningful response.\n"
                 "Please answer one of the technical questions or type *'exit'* to end."
             )
 
         # Clarification (general but job-related question)
-        if sim_to_hiring >= 0.25 and sim_to_hiring <= 0.50:
+        if sim_to_hiring >= 0.3 and sim_to_hiring <= 0.50:
             clarification_prompt = f"""
             The candidate asked a clarification related to the interview context:
 
@@ -474,6 +474,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
