@@ -22,7 +22,23 @@ if st.sidebar.button("Reset Chat"):
 st.title("TalentScout Hiring Assistant")
 st.write("Welcome! I will collect your basic details and then generate technical questions based on your tech stack.")
 
+# ----------------------------
+# GDPR / Privacy Notice + Consent
+# ----------------------------
+st.info("""
+🔒 **Privacy Notice (GDPR-Friendly)**  
+This Hiring Assistant is a **demo for academic purposes**.  
+Please enter **fictional (fake) candidate information only**.  
 
+Your responses are stored **locally and temporarily** for simulated backend processing.
+They are **not uploaded, not shared**, and will be erased automatically when the app restarts.
+""")
+
+user_ack = st.checkbox("I understand and agree to enter ONLY FAKE candidate information.")
+
+if not user_ack:
+    st.warning("Please check the box above to continue.")
+    st.stop()
 # ----------------------------
 # Initialize Session State
 # ----------------------------
@@ -212,12 +228,18 @@ def is_valid_experience(exp):
 # SIMULATED DATABASE SAVE
 # ----------------------------
 def save_candidate():
-    data = {
+    record = {
         "candidate": st.session_state.candidate,
         "sentiment_log": st.session_state.sentiment_log
     }
+
+    # Save locally to JSONL
     with open("candidate_records.jsonl", "a") as f:
-        f.write(json.dumps(data) + "\n")
+        f.write(json.dumps(record) + "\n")
+
+    # Return JSON string for download
+    return json.dumps(record, indent=4)
+
 
 
 # ----------------------------
@@ -230,15 +252,18 @@ def bot_reply(user_message):
 
     # EXIT HANDLING
     EXIT_KEYWORDS = ["exit", "quit", "bye", "thank you", "end"]
+    
     if any(word in user_message.lower().strip() for word in EXIT_KEYWORDS):
-        save_candidate()
+        saved_json = save_candidate() 
+        st.session_state.saved_json = saved_json
         st.session_state.step = "done"
         return (
             "Thank you for completing the screening! 🎉\n\n"
             "Your details have been recorded.\n"
-            "Our TalentScout hiring team will review your profile and contact you.\n"
+            "You may now download your screening summary below.\n"
             "Have a wonderful day!"
         )
+
 
     step = st.session_state.step
     c = st.session_state.candidate
@@ -339,12 +364,10 @@ def bot_reply(user_message):
         questions = call_llm(tech_prompt)
         return f"Great! Here are your tailored questions:\n\n{questions}\n\nYou may answer them now. Type 'exit' anytime."
 
+
     # ------------------------------
-    # ANSWER EVALUATION MODE
+    # ANSWER / CLARIFICATION / REWRITE / NONSENSE DETECTION
     # ------------------------------
-# ------------------------------
-# ANSWER / CLARIFICATION / REWRITE / NONSENSE DETECTION
-# ------------------------------
     if step == "generate_questions":
 
         # Embed user message
@@ -426,6 +449,15 @@ for speaker, msg in st.session_state.chat_history:
     else:
         st.markdown(f"**Assistant:** {msg}")
 
+# Show download button after exit
+if st.session_state.get("step") == "done" and st.session_state.get("saved_json"):
+    st.download_button(
+        label="📄 Download Your Candidate Summary",
+        data=st.session_state.saved_json,
+        file_name="candidate_summary.json",
+        mime="application/json"
+    )
+
 
 # ----------------------------
 # INPUT BOX (BOTTOM FIX)
@@ -442,6 +474,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
