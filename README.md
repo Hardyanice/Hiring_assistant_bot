@@ -106,11 +106,11 @@ This fulfills the assignment requirements for *contextual LLM behavior*.
 ## Data Privacy & GDPR Compliance
 
 This demo:  
-✔ Requires a **consent checkbox**  
-✔ Only accepts **fake candidate information**  
-✔ Stores data *locally* in JSONL  
-✔ Ensures data is never uploaded or shared  
-✔ Provides optional download of candidate’s **own data**  
+- Requires a **consent checkbox**  
+- Only accepts **fake candidate information**  
+- Stores data *locally* in JSONL  
+- Ensures data is never uploaded or shared  
+- Provides optional download of candidate’s **own data**  
 
 The project fully meets the data protection guidelines.
 
