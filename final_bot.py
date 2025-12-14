@@ -392,10 +392,9 @@ def bot_reply(user_message):
             "{user_message}"
 
             Respond naturally and professionally:
-            - Acknowledge the concern.
-            - Explain how the questions were generated (tech stack + experience + position).
+            - Explain how the questions were generated (tech stack + experience + position) only if candidate asks queries regarding tech stack or difficulty.
             - Offer to regenerate questions if needed.
-            - Keep tone supportive and conversational.
+            - Keep tone conversational.
             """
             return call_llm(clarification_prompt)
 
@@ -443,5 +442,6 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
