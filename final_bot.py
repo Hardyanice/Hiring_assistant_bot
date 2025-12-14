@@ -68,7 +68,7 @@ if "sentiment_log" not in st.session_state:
 # ----------------------------
 # Cohere Client
 # ----------------------------
-co = cohere.Client(os.getenv("COHERE_API_KEY","PgSVyIVx2nYWXthLEq9mZpdOy1fG7FgQFpakeLvG"))
+co = cohere.Client(os.getenv("COHERE_API_KEY","cKhNMyL9z5eTvY1xerKBtCW4NoZb97g6NhsJ0Oov"))
 
 
 # ----------------------------
@@ -494,6 +494,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
