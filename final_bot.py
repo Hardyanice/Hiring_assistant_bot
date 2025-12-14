@@ -203,70 +203,25 @@ def bot_reply(user_message):
     c = st.session_state.candidate
 
 
-    # ----------------------
-    # GREETING DETECTION
-    # ----------------------
-    def is_greeting(text):
-        GREETING_WORDS = [
-        # English
-        "hi", "hello", "hey", "hey there", "hi there", "hello there",
-        "good morning", "good afternoon", "good evening",
-        "greetings", "howdy",
     
-        # Friendly/slang
-        "hiya", "yo", "sup", "what's up", "whats up", "wassup", "sup?",
-    
-        # European
-        "hola",     # Spanish
-        "hallo",    # German
-        "bonjour",  # French
-        "ciao",     # Italian
-        "ola",      # Portuguese
-        "salut",    # French informal
-        "hej",      # Swedish/Danish
-        "hei",      # Norwegian/Finnish
-    
-        # Asian
-        "namaste", "namaskar",      # Hindi/Indian
-        "vanakkam",                 # Tamil
-        "salaam", "assalamu alaikum",  # Arabic greetings
-        "konnichiwa",               # Japanese
-        "annyeong", "annyeonghaseyo",  # Korean
-        "ni hao",                   # Chinese
-        "sawasdee",                 # Thai
-    
-        # Hawaiian / Pacific
-        "aloha",
-    
-        # Very short but valid greetings
-        "hi!", "hello!", "hey!"
-    ]
-
-
-        try:
-            # Embed user message
-            user_vec = co.embed(texts=[text], model="embed-english-v2.0").embeddings[0]
-
-            # Embed all greetings
-            greet_vecs = co.embed(texts=GREETING_WORDS, model="embed-english-v2.0").embeddings
-
-            # Compute max similarity
-            sims = [cosine_similarity(user_vec, g) for g in greet_vecs]
-            return max(sims) > 0.15
-        except:
-            return False
-
-
-
     # If still at the very beginning → give full intro
-    if is_greeting(user_message):
-    # First interaction → full intro
-        if step == "greet":
-            st.session_state.step = "name"
-            return "Hello! I'm TalentScout's Hiring Assistant.\n\nWhat is your full name?"
+    if step == "greet":
+        greet_prompt = """
+        You are the TalentScout Hiring Assistant.
+        Your task now: produce the natural greeting message that begins the interview.
     
-        # Mid-interview greeting → polite nudge
-        return "Hello again! Let's continue with your interview. Please go ahead."
+        Requirements:
+        - Introduce yourself briefly
+        - Explain that you will collect candidate information
+        - Ask the candidate for their full name
+        - Keep friendly, professional, and concise
+    
+        Respond with ONLY the greeting message, no extra commentary.
+        """
+    
+        greeting = call_llm(greet_prompt)
+        st.session_state.step = "name"
+        return greeting
 
     if step == "name":
         c["name"] = user_message
@@ -423,8 +378,9 @@ if user_input:
     st.session_state.chat_history.append(("User", user_input))
     bot_message = bot_reply(user_input)
     st.session_state.chat_history.append(("Assistant", bot_message))
-    st.session_state["force_rerun"] = False
-    #st.rerun()
+    st.session_state["force_rerun"] = True
+    st.rerun()
+
 
 
 
