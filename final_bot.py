@@ -423,8 +423,9 @@ if user_input:
     st.session_state.chat_history.append(("User", user_input))
     bot_message = bot_reply(user_input)
     st.session_state.chat_history.append(("Assistant", bot_message))
-    st.session_state["force_rerun"] = True
-    st.rerun()
+    st.session_state["force_rerun"] = False
+    #st.rerun()
+
 
 
 
