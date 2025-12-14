@@ -138,11 +138,43 @@ def get_sentiment_reference_vectors():
 
     return pos_vecs, neg_vecs
 
+@st.cache_resource
+def get_clarification_intent_vector():
+    CLARIFICATION_EXAMPLES = [
+        "what is required of me",
+        "what do you mean",
+        "explain the question",
+        "clarify the question",
+        "what should i write",
+        "can you explain question 1",
+        "what is expected in this question",
+        "how should I answer this",
+        "what does this question mean"
+    ]
+    vecs = co.embed(texts=CLARIFICATION_EXAMPLES, model="embed-english-v2.0").embeddings
+    return np.mean(vecs, axis=0)
+
+@st.cache_resource
+def get_answer_intent_vector():
+    ANSWER_EXAMPLES = [
+        "the answer is",
+        "you can do this by",
+        "this can be solved using",
+        "we handle this by",
+        "one approach is",
+        "in python you can",
+        "you should use",
+        "the solution involves",
+        "a method to do this is"
+    ]
+    vecs = co.embed(texts=ANSWER_EXAMPLES, model="embed-english-v2.0").embeddings
+    return np.mean(vecs, axis=0)
 
 hiring_avg_vector = get_hiring_vector()
 rewrite_intent_vector = get_rewrite_intent_vector()
 positive_vecs, negative_vecs = get_sentiment_reference_vectors()
-
+clarification_intent_vector = get_clarification_intent_vector()
+answer_intent_vector = get_answer_intent_vector()
 
 # ----------------------------
 # Sentiment Analysis
@@ -370,57 +402,88 @@ def bot_reply(user_message):
     # ------------------------------
     if step == "generate_questions":
 
-        # ---- Compute similarity safely ----
+        # ---- Embed user message ----
         try:
             user_vec = co.embed(texts=[user_message], model="embed-english-v2.0").embeddings[0]
-            sim_to_hiring = cosine_similarity(user_vec, hiring_avg_vector)
-            rewrite_sim = cosine_similarity(user_vec, rewrite_intent_vector)
         except:
-            sim_to_hiring = 0.0
-            rewrite_sim = 0.0
-        
-        # ---- 1. Rewrite request ----
-        if rewrite_sim > 0.50:
-            # (same rewrite block)
-            ...
-        
-        # ---- 2. TRUE NONSENSE (very low similarity) ----
-        # Only treat as nonsense if similarity is extremely low
-        if sim_to_hiring < 0.03:
+            user_vec = None
+    
+        # ---- Compute similarities ----
+        sim_hiring = cosine_similarity(user_vec, hiring_avg_vector) if user_vec is not None else 0
+        sim_rewrite = cosine_similarity(user_vec, rewrite_intent_vector) if user_vec is not None else 0
+        sim_clarify = cosine_similarity(user_vec, clarification_intent_vector) if user_vec is not None else 0
+        sim_answer = cosine_similarity(user_vec, answer_intent_vector) if user_vec is not None else 0
+    
+        # --- Rewrite intent (strongest priority) ---
+        if sim_rewrite > 0.55:
+            tech = c["tech_stack"]
+            role = c["position"]
+    
+            rewrite_prompt = f"""
+            The candidate has requested a new or modified question set.
+    
+            Regenerate a fresh set of technical interview questions based on:
+            - Tech stack: {tech}
+            - Position level: {role}
+    
+            Output clean bullet points only.
+            """
+    
+            new_q = call_llm(rewrite_prompt)
+            return f"Sure! Here is a new set of tailored questions:\n\n{new_q}"
+    
+        # --- Nonsense detection (very low similarity to everything) ---
+        if sim_hiring < 0.03 and sim_clarify < 0.10 and sim_answer < 0.10:
             return (
                 "Hmm, that doesn't look like a meaningful response.\n"
                 "Please answer one of the technical questions or type 'exit' to end."
             )
-        
-        # ---- 3. Clarification questions (moderate similarity) ----
-        if 0.03 <= sim_to_hiring <= 0.25:
+    
+        # --- Clarification questions ---
+        if sim_clarify > sim_answer and sim_clarify > 0.25:
             clarification_prompt = f"""
-            The candidate is asking for clarification:
-        
+            The candidate is asking a clarification:
+    
             "{user_message}"
-        
-            Respond naturally:
-            - Explain briefly what the question expects.
-            - Offer guidance.
-            - Keep it supportive and concise.
+    
+            Provide a helpful explanation:
+            - Clarify what the question expects.
+            - Give gentle guidance.
+            - Offer to regenerate questions if needed.
             """
+    
             return call_llm(clarification_prompt)
-        
-        # ---- 4. Technical answer (default handling) ----
-        evaluation_prompt = f"""
-        You are a senior interviewer evaluating the candidate's answer:
-        
-        \"\"\"{user_message}\"\"\" 
-        
+    
+        # --- Technical answer (dominant) ---
+        if sim_answer > sim_clarify and sim_answer > 0.20:
+            evaluation_prompt = f"""
+            You are a senior technical interviewer.
+    
+            Candidate's answer:
+            \"\"\"{user_message}\"\"\"\n
+    
+            Provide natural, conversational feedback:
+            - What they got right
+            - What they misunderstood or missed
+            - 1–2 improvement suggestions
+            - A follow-up question
+            """
+    
+            return call_llm(evaluation_prompt)
+    
+        # --- Default fallback (treat as answer but gently) ---
+        fallback_prompt = f"""
+        The candidate said:
+        \"\"\"{user_message}\"\"\"
+    
+        It might be a partial answer or unclear attempt.
         Provide:
-        - Acknowledgment of what they got right
-        - Missing parts
-        - 1–2 improvements
-        - A follow-up question
-        
-        Tone should be natural, human, and supportive.
+        - Acknowledgement
+        - Clarification on what the question expects
+        - Ask them to try again or elaborate
         """
-        return call_llm(evaluation_prompt)
+    
+        return call_llm(fallback_prompt)
 
 
 
@@ -458,6 +521,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
