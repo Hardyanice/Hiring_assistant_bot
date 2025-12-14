@@ -223,14 +223,12 @@ def bot_reply(user_message):
             return False
 
 
-    if is_greeting(user_message):
-        # If still at the very beginning → give full intro
-        if step == "greet":
+
+    # If still at the very beginning → give full intro
+    if step == "greet":
+        if is_greeting(user_message):
             st.session_state.step = "name"
             return "Hello! I'm TalentScout's Hiring Assistant.\n\nWhat is your full name?"
-    
-        # If user says hi in the middle, be polite but keep them on track
-        return "Hello again! Let's continue with your interview "
 
     if step == "name":
         c["name"] = user_message
@@ -389,6 +387,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
