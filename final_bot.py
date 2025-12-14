@@ -207,7 +207,7 @@ def bot_reply(user_message):
     # GREETING DETECTION
     # ----------------------
     def is_greeting(text):
-        GREETING_WORDS = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
+        GREETING_WORDS = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "aloha", "hola", "hallo"]
 
         try:
             # Embed user message
@@ -389,6 +389,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
