@@ -108,39 +108,6 @@ def get_all_reference_vectors():
             "tech stack declaration",
             "hiring assistant",
         ],
-        "rewrite": [
-            "rewrite the questions",
-            "regenerate new questions",
-            "give different questions",
-            "change the questions",
-            "new questions please",
-            "i want easier questions",
-            "give me harder questions",
-            "modify the questions",
-            "can you adjust the difficulty",
-        ],
-        "clarify": [
-            "what is required of me",
-            "what do you mean",
-            "explain the question",
-            "clarify the question",
-            "what should i write",
-            "can you explain question 1",
-            "what is expected in this question",
-            "how should I answer this",
-            "what does this question mean",
-        ],
-        "answer": [
-            "the answer is",
-            "you can do this by",
-            "this can be solved using",
-            "we handle this by",
-            "one approach is",
-            "in python you can",
-            "you should use",
-            "the solution involves",
-            "a method to do this is",
-        ],
         "positive": [
             "great", "happy", "confident", "excited", "good", "interested"
         ],
@@ -165,19 +132,11 @@ def get_all_reference_vectors():
     # Return resolved category vectors
     return {
         "hiring": np.mean(vectors[index_map["hiring"][0]:index_map["hiring"][1]], axis=0),
-        "rewrite": np.mean(vectors[index_map["rewrite"][0]:index_map["rewrite"][1]], axis=0),
-        "clarify": np.mean(vectors[index_map["clarify"][0]:index_map["clarify"][1]], axis=0),
-        "answer": np.mean(vectors[index_map["answer"][0]:index_map["answer"][1]], axis=0),
         "positive": vectors[index_map["positive"][0]:index_map["positive"][1]],
         "negative": vectors[index_map["negative"][0]:index_map["negative"][1]],
     }
 
 vectors = get_all_reference_vectors()
-
-hiring_avg_vector = vectors["hiring"]
-rewrite_intent_vector = vectors["rewrite"]
-clarification_intent_vector = vectors["clarify"]
-answer_intent_vector = vectors["answer"]
 
 positive_vecs = vectors["positive"]
 negative_vecs = vectors["negative"]
@@ -535,6 +494,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
