@@ -116,7 +116,7 @@ def call_llm(prompt: str):
     full_prompt = f"{SYSTEM_BEHAVIOR}\n\nUser: {prompt}"
 
     response = co.chat(
-        model="command-r-plus-08-2024",
+        model="command-a-03-2025",
         message=full_prompt,
         max_tokens=300,
         temperature=0.5
@@ -377,6 +377,7 @@ if user_input:
     st.session_state.chat_history.append(("Assistant", bot_message))
     st.session_state["force_rerun"] = True
     st.rerun()
+
 
 
 
